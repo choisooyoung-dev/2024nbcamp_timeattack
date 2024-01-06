@@ -17,16 +17,28 @@ export class User {
   @PrimaryGeneratedColumn({ unsigned: true })
   id: number;
 
+  /**
+   * 닉네임
+   * @example "ex01"
+   */
   @IsNotEmpty({ message: '닉네임을 입력해주세요.' })
   @IsString()
   @Column()
   nickname: string;
 
+  /**
+   * 이메일
+   * @example "ex01@gmail.com"
+   */
   @IsNotEmpty({ message: '이메일을 입력해주세요.' })
   @IsEmail()
   @Column({ unique: true })
   email: string;
 
+  /**
+   * 비밀번호
+   * @example "eX12312345!!@"
+   */
   @IsNotEmpty({ message: '비밀번호를 입력해주세요.' })
   @IsStrongPassword(
     { minLength: 6 },

@@ -7,6 +7,10 @@ export class SignUpDto extends PickType(User, [
   'nickname',
   'password',
 ]) {
+  /**
+   * 비밀번호 확인
+   * @example "eX12312345!!@"
+   */
   @IsNotEmpty({ message: '비밀번호 확인을 입력해주세요.' })
   @IsStrongPassword(
     { minLength: 6 },

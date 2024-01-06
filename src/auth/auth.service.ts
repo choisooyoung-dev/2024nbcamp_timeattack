@@ -3,10 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
+import { SignInDto } from './dto/sign-in.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {}
 
@@ -24,8 +29,8 @@ export class AuthService {
     }
 
     // 비밀번호 암호화
-    const saltOrRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltOrRounds);
+    const hashRounds = this.configService.get<number>('PASSWORD_HASH_ROUNDS');
+    const hashedPassword = bcrypt.hashSync(password, hashRounds);
 
     const user = await this.userRepository.save({
       email,
@@ -34,6 +39,31 @@ export class AuthService {
     });
     delete user.password;
 
-    return user;
+    return this.signIn(user.id);
+  }
+
+  async signIn(userId: number) {
+    const payload = { id: userId };
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload);
+    return { accessToken, refreshToken };
+  }
+
+  async validateUser({ email, password }: SignInDto) {
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: { id: true, password: true },
+    });
+
+    const isPasswordMatched = bcrypt.compareSync(
+      password,
+      user?.password ?? '',
+    );
+
+    if (!user || !isPasswordMatched) {
+      return null;
+    }
+
+    return { id: user.id };
   }
 }
