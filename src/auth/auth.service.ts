@@ -1,26 +1,80 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from 'src/user/entities/user.entity';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
+import { SignInDto } from './dto/sign-in.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+  ) {}
+
+  async signUp(email, nickname, password, passwordConfirm) {
+    const isPasswordMatched = password === passwordConfirm;
+    if (!isPasswordMatched) {
+      throw new BadRequestException(
+        '비밀번호와 비밀번호 확인이 서로 일치하지 않습니다.',
+      );
+    }
+
+    const existedUser = await this.userRepository.findOneBy({ email });
+    if (existedUser) {
+      throw new BadRequestException('이미 가입된 이메일입니다.');
+    }
+
+    // 비밀번호 암호화
+    const hashRounds = this.configService.get<number>('PASSWORD_HASH_ROUNDS');
+    const hashedPassword = bcrypt.hashSync(password, hashRounds);
+
+    const user = await this.userRepository.save({
+      email,
+      password: hashedPassword,
+      nickname,
+    });
+    delete user.password;
+
+    return this.signIn(user.id);
   }
 
-  findAll() {
-    return `This action returns all auth`;
+  async signIn(userId: number) {
+    const payload = { id: userId };
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION'),
+    });
+
+    const updateRefreshToUser = await this.userRepository.update(
+      { id: userId },
+      {
+        refreshToken,
+      },
+    );
+
+    return { accessToken, refreshToken };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
+  async validateUser({ email, password }: SignInDto) {
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: { id: true, password: true },
+    });
 
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
+    const isPasswordMatched = bcrypt.compareSync(
+      password,
+      user?.password ?? '',
+    );
 
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+    if (!user || !isPasswordMatched) {
+      return null;
+    }
+
+    return { id: user.id };
   }
 }
