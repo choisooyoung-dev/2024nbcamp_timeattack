@@ -47,8 +47,8 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @Post('/sign-in')
   async signIn(@Request() req, @Body() signInDto: SignInDto) {
-    const data = await this.authService.signIn(req.user.id);
-
+    const data = await this.authService.signIn(req.user);
+    req.res.setHeader('Set-cookie', [data.accessToken, data.refreshToken]);
     return { statsCode: HttpStatus.OK, message: '로그인 성공', data };
   }
 }

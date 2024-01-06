@@ -3,6 +3,9 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import csurf from 'csurf';
+import helmet from 'helmet';
+import { SecurityMiddleware } from './middleware/security.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,6 +30,18 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", 'trusted-scripts.com'],
+          // Add more directives as needed
+        },
+      },
+    }),
+  );
+  app.use(new SecurityMiddleware().use);
   await app.listen(port);
 }
 bootstrap();

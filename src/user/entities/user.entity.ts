@@ -50,6 +50,10 @@ export class User {
   @Column({ select: false })
   password: string;
 
+  @IsString()
+  @Column({ nullable: true })
+  refreshToken?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
